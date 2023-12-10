@@ -1,0 +1,189 @@
+module cpu (  input reg clck, input reg rst_n, input reg [31:0] in, output reg [31:0] out);
+
+// Instruction memory portion
+logic [31:0] inst_ram [4095:0];
+initial $readmemh("Lab4_test.txt",inst_ram);
+logic [11:0] PC_FETCH;
+logic [11:0] PC_EX;
+
+
+//Instruction declaration 
+logic [31:0] instruction_EX;
+logic [4:0] regdest_WB;
+logic [31:0] A_EX;
+logic [31:0] B_EX;
+logic alusrc_EX;
+logic [31:0] regdata2_EX;
+logic hex_we_EX;
+logic regwrite_WB;
+logic regwrite_EX;
+logic [2:0] regsel_WB,regsel_EX;
+logic [31:0] lui_val_WB;
+logic [31:0] R_WB, R_EX;
+logic [31:0] writedata_WB;
+logic [3:0] aluop_EX;
+logic [6:0] funct7_EX; 
+logic [6:0] op_EX;
+logic [2:0] funct3_EX;
+logic [4:0] r1_EX; 
+logic [4:0] r2_EX; 
+logic [4:0] r_d;
+logic [11:0] imm12_EX;
+logic [19:0] imm20_EX;
+logic [31:0] in_WB;
+logic zero_cpu;
+logic stall_EX;	
+
+// Additions: slides 54-55
+logic [12:0] branch_offset_EX;
+logic [11:0] branch_addr_EX;
+logic [19:0] jal_addr_EX;
+logic [20:0] jal_offset_EX;
+logic [11:0] jalr_addr_EX;
+logic [12:0] jalr_offset_EX;
+
+// Control PC mux
+logic [2:0] pcsrc_EX;
+logic pcsrc_BRANCH_EX;
+logic pcsrc_JUMP_EX;
+logic pcsrc_JUMPR_EX;
+always@(*) begin//set pcsrc to '1' if instruction is a branch
+	//pcsrc_EX = 2'b00;
+	if (pcsrc_BRANCH_EX == 1'b1 && R_EX == 32'b0 && aluop_EX == 4'b0100) begin //beq instruction
+		pcsrc_EX = 2'b01; 
+	end else if(pcsrc_BRANCH_EX == 1'b1 && R_EX != 32'b0 && aluop_EX == 4'b0100) begin // bne instruction
+		pcsrc_EX = 2'b01;
+	end else if(pcsrc_BRANCH_EX == 1'b1 && R_EX == 32'b1 && aluop_EX == 4'b1100) begin // blt instruction
+		pcsrc_EX = 2'b01;
+	end else if(pcsrc_BRANCH_EX == 1'b1 && R_EX == 32'b1 && aluop_EX == 4'b1101) begin // bltu instruction
+		pcsrc_EX = 2'b01;
+	end else if(pcsrc_BRANCH_EX == 1'b1 && R_EX == 32'b0 && aluop_EX == 4'b1100) begin //bge instruction
+		pcsrc_EX = 2'b01;
+	end else if(pcsrc_BRANCH_EX == 1'b1 && R_EX == 32'b0 && aluop_EX == 4'b1101) begin //bgeu instruction
+		pcsrc_EX = 2'b01;
+	end else if(pcsrc_JUMP_EX == 1'b1) begin //jal instruciton
+		pcsrc_EX = 2'b10;
+	end else if(pcsrc_JUMPR_EX == 1'b1) begin //jalr instruciton
+		pcsrc_EX = 2'b11;
+	end else begin
+		pcsrc_EX = 2'b00;
+	end
+end
+
+/*
+alusrc = 1'b1;
+regwrite = 1'b1;
+regsel = 2'b10;
+op = 4'b1011;
+gpio_we = 1'b0;
+*/
+//alusrc(alusrc_EX), .regwrite(regwrite_EX), .regsel(regsel_EX),
+//                .op(aluop_EX), .gpio_we(hex_we_EX)
+
+//control unit .stall_fetch(stall_EX)
+//always@(posedge clck) begin 
+//	if (stall_EX)
+//		instruction_EX <=0; //no_ops
+//end
+
+/*
+out <= (cond) ? value1 : vlue2;
+if pcscr==2'b00:
+   out<=pc+1;
+else if pcsrc==1:
+	out<=pc+1;
+*/
+
+// Additions: assigning new branch/jump offset and address variables
+assign branch_offset_EX = {instruction_EX[31], instruction_EX[7], instruction_EX[30:25], instruction_EX[11:8], 1'b0};
+assign branch_addr_EX = PC_EX + {branch_offset_EX[12], branch_offset_EX[12:2]};
+  
+assign jal_offset_EX = {instruction_EX[31], instruction_EX[20], instruction_EX[30:21], 1'b0};
+assign jal_addr_EX = PC_EX +jal_offset_EX[13:2];
+  
+assign jalr_offset_EX = instruction_EX[31:20];
+assign jalr_addr_EX = A_EX[11:0] + {{2{jalr_offset_EX[11]}}, jalr_offset_EX[11:2]};
+
+
+always_ff @(posedge clck) begin
+	// Fetch logic
+	if (~rst_n) begin
+		PC_FETCH <= 12'b0;
+//		instruction_EX <= 32'b0;
+//	end else if (stall_EX) begin
+//		instruction_EX <= 0; // no op
+	end else if (pcsrc_EX == 2'b01) begin  //branches
+		PC_FETCH <= branch_addr_EX;
+	end else if (pcsrc_EX == 2'b10) begin //jal
+		PC_FETCH <= jal_addr_EX;
+	end else if (pcsrc_EX == 2'b11) begin //jalr
+	   PC_FETCH <= jalr_addr_EX;
+	end else /*if (pcsrc_EX == 2'b00)*/ begin
+		PC_FETCH <= PC_FETCH + 1'b1;
+//		instruction_EX <= inst_ram[PC_FETCH];
+	end
+end
+
+always @(posedge clck) begin
+	if (stall_EX) begin
+		instruction_EX <= 32'b0; //no_ops
+	end
+	if (~rst_n) begin
+		instruction_EX <= 32'b0;
+	end else begin
+		instruction_EX <= inst_ram[PC_FETCH];
+	end
+end
+
+//output display
+always_ff @(posedge clck) begin
+    regdest_WB <= instruction_EX[11:7];
+    regwrite_WB <= regwrite_EX;
+    regsel_WB <= regsel_EX;
+    in_WB <= in;
+    lui_val_WB <= {instruction_EX[31:12], 12'b0};
+    R_WB <= R_EX;
+
+    if (hex_we_EX) begin
+        out <= A_EX;
+        $display("%h", out);
+    end
+end
+
+//sign extend
+always @(*) begin
+    if (alusrc_EX == 1'b0) begin
+        B_EX = regdata2_EX;
+    end else begin
+        B_EX = {{20{instruction_EX[31]}}, instruction_EX[31:20]};
+    end
+end
+
+
+//mux check
+always @(*) begin
+    case (regsel_WB)
+        2'b00: writedata_WB = in_WB;
+        2'b01: writedata_WB = lui_val_WB;
+		  2'b11: writedata_WB = {20'b0,PC_EX};
+        default: writedata_WB = R_WB;
+    endcase
+end
+
+// calling decoder 
+decoder dc(.instructionaddr(instruction_EX), .funct7(funct7_EX), .rs2(r2_EX), .rs1(r1_EX), .funct3(funct3_EX), .rd(r_d), .opcode(op_EX), .imm20(imm20_EX), .imm12(imm12_EX));
+
+//calling Control Unit
+ControlUnit cu (.funct7(funct7_EX), .rs2(r2_EX), .rs1(r1_EX), .funct3(funct3_EX), .rd(r_d), .opcode(op_EX),
+                .imm20(imm20_EX), .imm12(imm12_EX),.stall_FETCH(stall_EX),.alusrc(alusrc_EX), .regwrite(regwrite_EX), .regsel(regsel_EX),
+                .op(aluop_EX), .pcsrc_JUMP(pcsrc_JUMP_EX), .pcsrc_BRANCH(pcsrc_BRANCH_EX), .pcsrc_JUMPR(pcsrc_JUMPR_EX), .gpio_we(hex_we_EX));
+
+//calling regfile		
+regfile regfile_cpu (.clk(clck), .we(regwrite_WB), .readaddr1(instruction_EX[19:15]), .readaddr2(instruction_EX[24:20]),
+             .writeaddr(regdest_WB), .writedata(writedata_WB), .readdata1(A_EX), .readdata2(regdata2_EX));
+//calling alu
+alu alu_cpu (.A(A_EX), .B(B_EX), .op(aluop_EX), .R(R_EX), .zero(zero_cpu));
+
+
+endmodule
+

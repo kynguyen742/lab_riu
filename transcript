@@ -1,0 +1,64 @@
+# //  Questa Sim-64
+# //  Version 2020.1 linux_x86_64 Jan 28 2020
+# //
+# //  Copyright 1991-2020 Mentor Graphics Corporation
+# //  All Rights Reserved.
+# //
+# //  QuestaSim and its associated documentation contain trade
+# //  secrets and commercial or financial information that are the property of
+# //  Mentor Graphics Corporation and are privileged, confidential,
+# //  and exempt from disclosure under the Freedom of Information Act,
+# //  5 U.S.C. Section 552. Furthermore, this information
+# //  is prohibited from disclosure under the Trade Secrets Act,
+# //  18 U.S.C. Section 1905.
+# //
+# OpenFile cpu.sv
+vlog -reportprogress 300 -work work /acct/kyn/Downloads/lab_riu/cpu.sv
+# QuestaSim-64 vlog 2020.1 Compiler 2020.01 Jan 28 2020
+# Start time: 14:45:29 on Dec 10,2023
+# vlog -reportprogress 300 -work work /acct/kyn/Downloads/lab_riu/cpu.sv 
+# -- Compiling module cpu
+# 
+# Top level modules:
+# 	cpu
+# End time: 14:45:29 on Dec 10,2023, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+vsim work.cpu -voptargs=+acc
+# vsim work.cpu -voptargs="+acc" 
+# Start time: 14:45:37 on Dec 10,2023
+# ** Note: (vsim-3813) Design is being optimized due to module recompilation...
+# Loading sv_std.std
+# Loading work.cpu(fast)
+# Loading work.decoder(fast)
+# Loading work.regfile(fast)
+# Loading work.ControlUnit(fast)
+# Loading work.alu(fast)
+add wave -position insertpoint sim:/cpu/*
+force -freeze sim:/cpu/clck 1 0, 0 {50 ns} -r 100
+force rst_n 0
+run
+# xxx xxxxxxxx
+# 000 00000000
+force rst_n 1
+run
+# 000 00000000
+run
+# 001 fff00213
+run
+# 002 00200293
+run
+# 003 00520c63
+run
+# 004 00521a63
+run
+# 005 00524a63
+run
+# 009 014000ef
+run
+# 00a 000080e7
+run
+# xxx fe5254e3
+run
+# xxx xxxxxxxx
+# End time: 15:11:48 on Dec 10,2023, Elapsed time: 0:26:11
+# Errors: 0, Warnings: 0
