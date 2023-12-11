@@ -1,8 +1,8 @@
 module cpu (input reg clck, input reg rst_n, input reg [31:0] in, output reg [31:0] out);
 	logic [31:0] inst_ram [4095:0];
 	initial begin 
-	$readmemh("lab4Test.txt",inst_ram);
-		//$readmemh("Lab4_test.txt",inst_ram);
+		$readmemh("lab4Test.txt",inst_ram); // Test program
+		//$readmemh("Lab4_test.txt",inst_ram); //DE2-115 board deployed code
 	end
 		logic [11:0] PC_FETCH; 
 		logic [11:0] PC_EX;
